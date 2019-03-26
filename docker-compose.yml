@@ -1,0 +1,88 @@
+version: "3.3"
+services:
+    
+    #PHP Service
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+            args:
+                APP_IMAGE: ${APP_IMAGE}
+        image: rbvergara/php
+        container_name: app
+        restart: unless-stopped
+        tty: true
+        volumes:
+            - "/DockerLEMP/www:/var/www"
+            - "/DockerLEMP/php/config/local.ini:/usr/local/etc/php/conf.d/local.ini"
+        working_dir: /var/www
+        networks:
+            - app-network
+    
+    #MariaDB Service
+    mariadb:
+        image: "mariadb/server:${MARIADB_VERSION}"
+        container_name: mariadb
+        restart: unless-stopped
+        tty: true
+        ports:
+            - "3306:3306"
+        environment:
+            MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+            MYSQL_DATABASE: ${DB_NAME}
+            MYSQL_USER: ${DB_USER}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+        volumes:
+            - "mariadbdata:/var/lib/mysql"
+            #- "/DockerLEMP/mariadb/config/my.cnf:/etc/mysql/conf.d/my.cnf:ro"
+            - type: bind
+              source: /DockerLEMP/mariadb/config/my.cnf
+              target: /etc/mysql/conf.d/my.cnf
+              read_only: true
+        networks:
+            - app-network
+    
+    #Nginx Service
+    web:
+        image: "nginx:${NGINX_VERSION}"
+        container_name: web
+        restart: unless-stopped
+        tty: true
+        ports:
+            - "80:80"
+            - "443:443"
+        depends_on: 
+            - mariadb
+            - app
+        volumes:
+            - "/DockerLEMP/www:/var/www"
+            - "/DockerLEMP/nginx/config/app.conf:/etc/nginx/conf.d/app.conf"
+        working_dir: /var/www
+        networks:
+            - app-network
+    
+    #PhpMyAdmin Service
+    pma:
+        image: "phpmyadmin/phpmyadmin:${PHPMYADMIN_VERSION}"
+        container_name: pma
+        restart: unless-stopped
+        ports:
+            - "8080:80"
+        depends_on: 
+            - mariadb
+        environment:
+            PMA_ARBITRARY: 1
+        networks:
+            - app-network
+    
+#Docker Networks
+networks:
+    app-network:
+        driver: bridge
+
+#Volumes
+volumes:
+    mariadbdata:
+        driver: local
+    mysqldata:
+        driver: local
